@@ -1,0 +1,379 @@
+REPORT zil_cake_shop.
+
+TYPES: BEGIN OF ty_cake,
+         cake_id     TYPE n LENGTH 8,
+         name        TYPE c LENGTH 250,
+         type        TYPE c LENGTH 250,
+         description TYPE c LENGTH 250,
+         price       TYPE p DECIMALS 2,
+         quantity    TYPE i,
+         currency    TYPE c LENGTH 5,
+       END OF ty_cake.
+
+TYPES: BEGIN OF ty_order_items,
+         order_id    TYPE n LENGTH 8,
+         cake_id     TYPE n LENGTH 8,
+         inscription TYPE c LENGTH 50,
+         candles     TYPE i,
+         fountain    TYPE i,
+         quantity    TYPE i,
+         pieces      TYPE i,
+       END OF ty_order_items.
+
+CONSTANTS: gc_currency          TYPE c LENGTH 5 VALUE 'EUR',
+           gc_inscription_price TYPE p DECIMALS 2 VALUE '5.00',
+           gc_candle_price      TYPE p DECIMALS 2 VALUE '1.20',
+           gc_fountain_price    TYPE p DECIMALS 2 VALUE '2.50'.
+
+TYPES: BEGIN OF ty_customer,
+         customer_id TYPE n LENGTH 10,
+         name        TYPE c LENGTH 250,
+         last_name   TYPE c LENGTH 250,
+         phone       TYPE c LENGTH 250,
+         email       TYPE c LENGTH 250,
+       END OF ty_customer.
+
+TYPES: BEGIN OF ty_order,
+         order_id    TYPE i,
+         customer_id TYPE n LENGTH 10,
+         order_date  TYPE d,
+         pickup_date TYPE d,
+         total_cost  TYPE p DECIMALS 2,
+         discount    TYPE p DECIMALS 2,
+         status      TYPE c LENGTH 250,
+       END OF ty_order.
+
+TYPES: tt_cakes       TYPE SORTED TABLE OF ty_cake WITH UNIQUE KEY cake_id,
+       tt_orders      TYPE SORTED TABLE OF ty_order WITH UNIQUE KEY order_id,
+       tt_order_items TYPE STANDARD TABLE OF ty_order_items WITH NON-UNIQUE KEY order_id cake_id,
+       tt_customers   TYPE SORTED TABLE OF ty_customer WITH UNIQUE KEY customer_id.
+
+DATA: gt_cakes       TYPE tt_cakes,
+      gt_orders      TYPE tt_orders,
+      gt_order_items TYPE tt_order_items,
+      gt_customers   TYPE tt_customers.
+
+DATA: ls_cake       TYPE ty_cake,
+      ls_order      TYPE ty_order,
+      ls_order_item TYPE ty_order_items,
+      ls_customer   TYPE ty_customer.
+
+DATA: gv_order_count      TYPE i VALUE 0,
+      gt_total_price      TYPE p DECIMALS 2,
+      gv_error            TYPE c LENGTH 1,
+      gt_cake_ids         TYPE STANDARD TABLE OF string WITH DEFAULT KEY,
+      gv_cake_id          TYPE n LENGTH 8,
+      gv_cake_count       TYPE i,
+      gv_discount_percent TYPE p DECIMALS 2 VALUE 0,
+      gv_discount_amount  TYPE p DECIMALS 2 VALUE 0,
+      gv_cake_price type p DECIMALS 2.
+.
+
+SELECTION-SCREEN BEGIN OF BLOCK b1 WITH FRAME TITLE TEXT-001.
+  PARAMETERS: p_cus_id TYPE n LENGTH 10 OBLIGATORY,
+              p_f_name TYPE c LENGTH 250,
+              p_l_name TYPE c LENGTH 250,
+              p_phone  TYPE c LENGTH 250,
+              p_email  TYPE c LENGTH 250.
+SELECTION-SCREEN END OF BLOCK b1.
+
+SELECTION-SCREEN BEGIN OF BLOCK b2 WITH FRAME TITLE TEXT-002.
+  PARAMETERS: rb_view  RADIOBUTTON GROUP grp1 DEFAULT 'X',
+              rb_order RADIOBUTTON GROUP grp1,
+              rb_canc  RADIOBUTTON GROUP grp1.
+SELECTION-SCREEN END OF BLOCK b2.
+
+SELECTION-SCREEN BEGIN OF BLOCK b3 WITH FRAME TITLE TEXT-003.
+
+  SELECTION-SCREEN COMMENT /1(75) TEXT-005.
+  PARAMETERS: p_cakes TYPE string LOWER CASE.
+  PARAMETERS: p_inscr TYPE c LENGTH 250,
+              p_cand  TYPE i,
+              p_fount TYPE i.
+SELECTION-SCREEN END OF BLOCK b3.
+
+SELECTION-SCREEN BEGIN OF BLOCK b4 WITH FRAME TITLE TEXT-004.
+  PARAMETERS: rb_pc8  RADIOBUTTON GROUP grp2 DEFAULT 'X',
+              rb_pc16 RADIOBUTTON GROUP grp2.
+SELECTION-SCREEN END OF BLOCK b4.
+
+AT SELECTION-SCREEN.
+  CLEAR gv_error.
+
+  IF p_cus_id IS INITIAL.
+    MESSAGE 'Enter customer ID!' TYPE 'E'.
+  ENDIF.
+
+  IF rb_order = 'X'.
+    IF p_cakes IS INITIAL.
+      MESSAGE 'Enter at least one cake ID' TYPE 'E'.
+    ENDIF.
+  ENDIF.
+
+
+INITIALIZATION.
+
+  gt_cakes = VALUE #(
+  ( cake_id = '1'
+   name ='Black velvet'
+   type = 'Chocolate'
+   description = 'Combination of chocolate layers with chocolate mousse drenched in liquid chocolate, decorated with crispy chocolate macarons.'
+   price ='30.00'
+   quantity = 160 )
+( cake_id = '2'
+name = 'Saher'
+type = 'Chocolate'
+description = 'Chocolate cream with chocolate layers and pieces of walnuts and fig jam.'
+price = '27.00'
+quantity = 86 )
+( cake_id = '3'
+name = 'Garache'
+type = 'Chocolate'
+description = 'Combination of two chocolate types and thick walnut plates with decorative spiral glaze.'
+price = '25.80'
+quantity = 43 )
+( cake_id = '4'
+name = 'Red velvet'
+type = 'Cacao'
+description = 'Layers with cocoa and coffee, wrapped in a delicate combination of cream cheese, cream and vanilla.'
+price = '30.50'
+quantity = 103 )
+( cake_id = '5'
+name = 'Carrot cake'
+type = 'Fruit'
+description = 'Combination of mascarpone, cream cheese, cream, carrots, walnuts, raisins, cinnamon and coffee.'
+price = '26.20'
+quantity = 113 )
+( cake_id = '6'
+name = 'Fruit cake'
+type = 'Fruit'
+description = 'Fresh combination of fragrant strawberries, juicy oranges, kiwi and banana slices, on fluffy white syrupy layers with milk cream.'
+price = '22.00'
+quantity = 82 )
+( cake_id = '7'
+name = 'Japanese matcha'
+type = 'Matcha'
+description = 'Matcha green tea layers and coffee, wrapped in a delicate combination of cream cheese and cream.'
+price = '27.50'
+quantity = 125 )
+( cake_id = '8'
+name = ' Berry eclair '
+type = 'Fruit'
+description = 'Handmade eclairs filled with milk cream, vanilla mousse and topped with berry jelly and sliced almonds.'
+price = '29.70'
+quantity = 56 )
+( cake_id = '9'
+name = 'Chocolate cookie'
+type = 'Chocolate'
+description = 'Rich chocolate cake with crunchy cookies, walnut pieces and brownie.'
+price = '30.60'
+quantity = 91 )
+( cake_id = '10'
+name = 'Chocolate eclair'
+type = 'Chocolate'
+description = 'Cake with a walnut core, handmade eclairs with milk cream, chocolate cream and covered with liquid chocolate.'
+price = '28.40'
+quantity = 37 )
+( cake_id = '11'
+name = 'Honey yogurt'
+type = 'Vanilla'
+description = 'A light combination of yogurt, mousse, honey plates and crunchy walnuts.'
+price = '26.10'
+quantity = 50 )
+( cake_id = '12'
+name = 'Bavaria'
+type = 'Vanilla'
+description = 'Combination of bavarian cream, brown biscuits, chocolate layers, decorated with white and milk chocolate.'
+price = '25.50'
+quantity = 97 )
+( cake_id = '13'
+name = 'Chocolate hazelnut'
+type = 'Chocolate'
+description = 'Cake with two types of chocolate and chocolate mousse, white layers with chocolate chips, hazelnuts and raisins.'
+price = '23.40'
+quantity = 62 )
+( cake_id = '14'
+name = 'French kiss'
+type = 'Vanilla'
+description = 'Layers of freshly baked kisses, glued together with delicate cream, liquid chocolate and chocolate chips.'
+price = '25.30'
+quantity = 53 )
+( cake_id = '15'
+name = 'Pistachio cake'
+type = 'Vanilla'
+description = 'Sponge cakes, light vanilla cream with pistachio paste, pieces of pistachios, topped with white chocolate and sliced almonds.'
+price = '24.20'
+quantity = 62 )
+( cake_id = '16'
+name = 'Strawberry cake'
+type = 'Fruit'
+description = 'Combination of chocolate layers, cream, milk cream, fresh strawberries and lots of chocolate.'
+price = '24.70'
+quantity = 75 )
+( cake_id = '17'
+name = 'Honey fig cake'
+type = 'Fruit'
+description = 'Honey layers, yogurt cream with fig flavor and a finish of white grated chocolate.'
+price = '30.30'
+quantity = 60 )
+( cake_id = '18'
+name = 'French country cake'
+type = 'Vanilla'
+description = 'Honey layers, soaked in yogurt cream, sprinkled with honey shavings.'
+price = '23.20'
+quantity = 120 )
+( cake_id = '19'
+name = 'Biscuit-chocolate cake'
+type = 'Chocolate'
+description = 'Cake with thick cream with milk chocolate flavor and butter biscuits, topped with pieces of fine chocolate.'
+price = '28.00'
+quantity = 58 )
+( cake_id = '20'
+name = 'Snickers cake'
+type = 'Chocolate'
+description = 'Cake with thick cream with milk chocolate flavor and butter biscuits, topped with pieces of fine chocolate.'
+price = '24.20'
+quantity = 99 ) ).
+
+START-OF-SELECTION.
+  IF rb_view = 'X'.
+    WRITE: / '==============================================================================================================================='.
+    WRITE: / '                          Cake catalog'.
+    WRITE: / '==============================================================================================================================='.
+    LOOP AT gt_cakes INTO ls_cake.
+      WRITE / |ID: { ls_cake-cake_id } |.
+      WRITE / |Name: { ls_cake-name } |.
+      WRITE / |Type: { ls_cake-type } |.
+      WRITE / |Description: { ls_cake-description }| .
+      WRITE / |Price for 8 pieces: { ls_cake-price } { gc_currency }| .
+      WRITE / |Price for 16 pieces: { ls_cake-price * 2 DECIMALS = 2 } { gc_currency }| .
+      WRITE / |Quantity: { ls_cake-quantity }| .
+      WRITE /.
+    ENDLOOP.
+
+  ELSEIF rb_order = 'X'.
+    CLEAR gt_cake_ids.
+    SPLIT p_cakes AT ',' INTO TABLE DATA(lt_cake_strings).
+
+    LOOP AT lt_cake_strings INTO DATA(lv_cake_string).
+      IF lv_cake_string IS NOT INITIAL.
+        gv_cake_id = lv_cake_string.
+        APPEND gv_cake_id TO gt_cake_ids.
+      ENDIF.
+    ENDLOOP.
+    READ TABLE gt_customers INTO ls_customer WITH KEY customer_id = p_cus_id.
+    IF sy-subrc <> 0.
+      ls_customer-customer_id = p_cus_id.
+      ls_customer-name = p_f_name.
+      ls_customer-last_name = p_l_name.
+      ls_customer-phone = p_phone.
+      ls_customer-email = p_email.
+      INSERT ls_customer INTO TABLE gt_customers.
+      IF sy-subrc = 0.
+        WRITE |New customer added: { p_f_name } { p_l_name }|.
+      ENDIF.
+    ELSE.
+      WRITE |Customer found: { ls_customer-name } { ls_customer-last_name }|.
+    ENDIF.
+
+    gv_order_count += 1.
+
+    ls_order-order_id = gv_order_count.
+    ls_order-customer_id = p_cus_id.
+    ls_order-order_date = sy-datum.
+    ls_order-status = 'New'.
+    ls_order-total_cost = 0.
+    WRITE / |================================|.
+    WRITE / |Order id: { ls_order-order_id }|.
+    WRITE / |================================|.
+
+    LOOP AT gt_cake_ids INTO DATA(lv_id_string).
+  gv_cake_id = lv_id_string.
+  READ TABLE gt_cakes INTO ls_cake WITH KEY cake_id = gv_cake_id.
+  IF sy-subrc = 0.
+    IF ls_cake-quantity > 0.
+
+      ls_order_item-order_id = gv_order_count.
+      ls_order_item-cake_id = gv_cake_id.
+
+      IF rb_pc8 = 'X'.
+        ls_order_item-pieces = 8.
+        gv_cake_price = ls_cake-price.
+      ELSEIF rb_pc16 = 'X'.
+        ls_order_item-pieces = 16.
+        gv_cake_price = ls_cake-price * 2.
+      ENDIF.
+      ls_order-total_cost += gv_cake_price.
+      gv_cake_count += 1.
+
+      INSERT ls_order_item INTO TABLE gt_order_items.
+
+      ls_cake-quantity -= 1.
+      MODIFY TABLE gt_cakes FROM ls_cake.
+
+      WRITE / |Cake: { ls_cake-name }|.
+      WRITE / |Pieces: { ls_order_item-pieces }|.
+      WRITE / |Price: { ls_order-total_cost DECIMALS = 2 } { gc_currency }|.
+      WRITE /.
+
+    ELSE.
+      WRITE / |Cake { ls_cake-name } is out of stock.|.
+      WRITE /.
+    ENDIF.
+  ELSE.
+    WRITE / |Cake ID { gv_cake_id } not found.|.
+    WRITE /.
+  ENDIF.
+ENDLOOP.
+
+    IF gt_order_items IS NOT INITIAL.
+      READ TABLE gt_order_items INTO ls_order_item INDEX 1.
+      ls_order_item-inscription = p_inscr.
+      ls_order_item-candles = p_cand.
+      ls_order_item-fountain = p_fount.
+      MODIFY gt_order_items FROM ls_order_item INDEX 1.
+    ENDIF.
+
+    IF p_inscr IS NOT INITIAL.
+      ls_order-total_cost += gc_inscription_price.
+    ENDIF.
+
+    IF p_cand > 0.
+      ls_order-total_cost += p_cand * gc_candle_price.
+    ENDIF.
+
+    IF p_fount > 0.
+      ls_order-total_cost += p_fount * gc_fountain_price.
+    ENDIF.
+
+    IF gv_cake_count >= 15.
+      gv_discount_percent = 15.
+      gv_discount_amount = ls_order-total_cost * '0.15'.
+    ELSEIF gv_cake_count >= 5.
+      gv_discount_percent = 10.
+      gv_discount_amount = ls_order-total_cost * '0.10'.
+    ELSEIF gv_cake_count >= 3.
+      gv_discount_percent = 5.
+      gv_discount_amount = ls_order-total_cost * '0.05'.
+    ELSE.
+      gv_discount_percent = 0.
+      gv_discount_amount = ls_order-total_cost.
+    ENDIF.
+
+    ls_order-discount = gv_discount_amount.
+ls_order-total_cost -= gv_discount_amount.
+
+    INSERT ls_order INTO TABLE gt_orders.
+
+    WRITE / |=============================|.
+    WRITE / |Inscription: { ls_order_item-inscription }|.
+    WRITE / |Candles: { ls_order_item-candles }|.
+    WRITE / |Fountain candles: { ls_order_item-fountain }|.
+    WRITE / |Discount ({ gv_discount_percent })% (-{ gv_discount_amount DECIMALS = 2 } { gc_currency })|.
+    WRITE / |Total cost: { ls_order-total_cost DECIMALS = 2 } { gc_currency }|.
+    WRITE / |Order date: { ls_order-order_date DATE = USER }|.
+
+  ELSEIF rb_canc = 'X'.
+    WRITE / |Order cancelled.|.
+
+  ENDIF.
