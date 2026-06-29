@@ -1,4 +1,4 @@
-# ABAP
+# Cake shop
 This program is a simple cake shop managment system written in ABAP. It allows browsing a cake catalog, placing orders with custom options and managing customer records. 
 
 # Features:
